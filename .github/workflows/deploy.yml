@@ -91,7 +91,9 @@ jobs:
       - name: Register targets (GitOps → Admin API)
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
-        run: npm run register -w scanner -- --file targets.yaml --api "$AR_WORKER_URL"
+        # `npm run -w scanner` runs with the scanner dir as cwd, so use an
+        # absolute path to the repo-root targets.yaml.
+        run: npm run register -w scanner -- --file "$GITHUB_WORKSPACE/targets.yaml" --api "$AR_WORKER_URL"
 
       - name: Build + deploy Pages
         run: |

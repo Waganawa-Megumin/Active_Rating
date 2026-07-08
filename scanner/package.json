@@ -1,0 +1,27 @@
+{
+  "name": "@ar/scanner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ar-scan": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@ar/shared": "*",
+    "zod": "^3.23.8",
+    "ulidx": "^2.4.1",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "esbuild": "^0.24.0",
+    "@types/node": "^22.10.1"
+  },
+  "scripts": {
+    "scan": "tsx src/cli.ts",
+    "register": "tsx src/register.ts",
+    "build": "esbuild src/cli.ts src/register.ts --bundle --platform=node --format=esm --target=node22 --outdir=dist --packages=bundle",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

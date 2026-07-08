@@ -1,0 +1,70 @@
+[
+  {
+    "entity_type": "subdomain",
+    "identity": "www.example.com",
+    "attributes": {
+      "resolves": true,
+      "a": [
+        "203.0.113.10"
+      ]
+    },
+    "observed_at": "2026-07-08T00:00:00.000Z",
+    "signals": {
+      "source_count": 2,
+      "active_resolved": true,
+      "in_owned_asn": true,
+      "not_wildcard": true
+    }
+  },
+  {
+    "entity_type": "subdomain",
+    "identity": "api.example.com",
+    "attributes": {
+      "resolves": true,
+      "a": [
+        "203.0.113.21"
+      ]
+    },
+    "observed_at": "2026-07-08T00:00:00.000Z",
+    "signals": {
+      "source_count": 2,
+      "active_resolved": true,
+      "in_owned_asn": true,
+      "not_wildcard": true
+    }
+  },
+  {
+    "entity_type": "subdomain",
+    "identity": "mail.example.com",
+    "attributes": {
+      "resolves": true,
+      "a": [
+        "203.0.113.30"
+      ],
+      "mx": true
+    },
+    "observed_at": "2026-07-08T00:00:00.000Z",
+    "signals": {
+      "source_count": 2,
+      "active_resolved": true,
+      "in_owned_asn": true,
+      "not_wildcard": true
+    }
+  },
+  {
+    "entity_type": "subdomain",
+    "identity": "staging.example.com",
+    "attributes": {
+      "resolves": true,
+      "a": [
+        "203.0.113.55"
+      ]
+    },
+    "observed_at": "2026-07-08T00:00:00.000Z",
+    "signals": {
+      "source_count": 1,
+      "active_resolved": true,
+      "not_wildcard": true
+    }
+  }
+]

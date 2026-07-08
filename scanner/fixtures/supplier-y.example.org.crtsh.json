@@ -1,0 +1,17 @@
+[
+  {
+    "entity_type": "subdomain",
+    "identity": "www.supplier-y.example.org",
+    "attributes": {
+      "resolves": true,
+      "a": [
+        "192.0.2.10"
+      ]
+    },
+    "observed_at": "2026-07-08T00:00:00.000Z",
+    "signals": {
+      "source_count": 1,
+      "not_wildcard": true
+    }
+  }
+]

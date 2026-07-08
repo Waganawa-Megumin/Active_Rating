@@ -1,0 +1,52 @@
+Active Rating — Proprietary License (Private Use, No AI Training)
+SPDX-License-Identifier: LicenseRef-ActiveRating-Proprietary
+
+Copyright (c) 2026 waganawa-megumin. All rights reserved.
+
+This software and all accompanying materials — including source code,
+documentation, configuration, design documents, data, and other artifacts
+(collectively, the "Software") — are the private, proprietary property of the
+copyright holder identified above (the "Owner"). The Software is NOT open
+source and is NOT licensed to the public.
+
+1. PRIVATE USE ONLY
+   Use of the Software is permitted solely by the Owner (and persons the Owner
+   explicitly authorizes in writing) for the Owner's own private, internal,
+   non-commercial purposes. No other use is granted.
+
+2. NO REDISTRIBUTION
+   You may not copy, publish, distribute, sublicense, sell, rent, lease, lend,
+   host as a service, or otherwise make the Software (in source or binary form,
+   in whole or in part) available to any third party without the Owner's prior
+   written permission.
+
+3. NO DERIVATIVE DISTRIBUTION
+   You may not distribute modified or derivative versions of the Software.
+
+4. PROHIBITION ON AI / MACHINE-LEARNING USE  (AI学習禁止)
+   The Software may NOT, in whole or in part, be used to train, fine-tune,
+   evaluate, benchmark, retrieve-augment, distill, or otherwise develop or
+   improve any artificial-intelligence or machine-learning model, dataset,
+   embedding, or system. Ingesting, scraping, or incorporating the Software
+   into any AI/ML training corpus or pipeline is expressly forbidden. This
+   prohibition applies to automated agents and crawlers as well as to humans.
+
+5. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+6. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+   FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+7. RESPONSIBLE-USE / AUTHORIZATION NOTICE
+   The Software performs attack-surface reconnaissance and assessment. Active
+   ("active"-profile) techniques may be used only against assets the operator
+   owns or is explicitly authorized to test. Third-party ("passive"-profile)
+   targets must never be actively scanned. The operator is solely responsible
+   for complying with all applicable laws, contracts, and rules of engagement.
+
+All rights not expressly granted are reserved by the Owner.

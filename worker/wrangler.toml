@@ -1,0 +1,38 @@
+name = "active-rating"
+main = "src/index.ts"
+compatibility_date = "2024-11-27"
+compatibility_flags = ["nodejs_compat"]
+
+# --- D1 (structured store) ---
+# After `wrangler d1 create active_rating`, paste the printed database_id here.
+[[d1_databases]]
+binding = "DB"
+database_name = "active_rating"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# --- R2 (raw results / evidence snapshots) ---
+[[r2_buckets]]
+binding = "EVIDENCE"
+bucket_name = "active-rating-evidence"
+
+# --- Queue (event-driven pinpoint re-eval) ---
+[[queues.producers]]
+binding = "REEVAL_QUEUE"
+queue = "ar-reeval"
+
+[[queues.consumers]]
+queue = "ar-reeval"
+max_batch_size = 10
+max_retries = 3
+
+# --- Cron: CT/KEV poll + resend unnotified Slack (every 6h) ---
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+OFFLINE = "0"
+SLACK_ENABLED = "1"
+# Secrets (set via `wrangler secret put`, NEVER commit):
+#   INGEST_HMAC_SECRET   - shared with the scanner for /ingest signing
+#   ADMIN_TOKEN          - bearer token for the registration Admin API
+#   SLACK_WEBHOOK_URL    - Slack incoming webhook

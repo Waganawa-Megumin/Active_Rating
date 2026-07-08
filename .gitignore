@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+.npm/
+
+# build output
+dist/
+pages/dist/
+**/dist/
+
+# cloudflare / wrangler
+.wrangler/
+.dev.vars
+wrangler.local.toml
+
+# local env / secrets
+.env
+.env.local
+*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# test coverage
+coverage/

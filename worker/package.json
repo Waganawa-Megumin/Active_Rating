@@ -1,0 +1,27 @@
+{
+  "name": "@ar/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ar/shared": "*",
+    "hono": "^4.6.14",
+    "ulidx": "^2.4.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241205.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^11.10.0",
+    "wrangler": "^3.95.0"
+  },
+  "scripts": {
+    "dev": "wrangler dev --local --persist-to .wrangler/state --port 8787",
+    "deploy": "wrangler deploy",
+    "db:apply:local": "wrangler d1 execute active_rating --local --persist-to .wrangler/state --file=./schema.sql",
+    "db:apply:remote": "wrangler d1 execute active_rating --remote --file=./schema.sql",
+    "seed:local": "wrangler d1 execute active_rating --local --persist-to .wrangler/state --file=./seed/seed.sql",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

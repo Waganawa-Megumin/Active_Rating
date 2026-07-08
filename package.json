@@ -1,0 +1,35 @@
+{
+  "name": "active-rating",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Active Rating — evidence-based active attack-surface rating platform",
+  "license": "LicenseRef-ActiveRating-Proprietary",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "shared",
+    "scanner",
+    "worker",
+    "pages"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build -w scanner && npm run build -w pages",
+    "db:apply:local": "npm run db:apply:local -w worker",
+    "db:apply:remote": "npm run db:apply:remote -w worker",
+    "seed:local": "npm run seed:local -w worker",
+    "dev:worker": "npm run dev -w worker",
+    "dev:pages": "npm run dev -w pages",
+    "scan": "npm run scan -w scanner --",
+    "scan:offline": "npm run scan -w scanner -- --offline",
+    "register": "npm run register -w scanner --"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

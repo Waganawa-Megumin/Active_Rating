@@ -1,0 +1,24 @@
+name: ci
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # All checks are offline / fixture-based — no secrets, no network scans.
+      - name: typecheck
+        run: npm run typecheck
+      - name: test
+        run: npm test
+      - name: build (scanner + pages)
+        run: npm run build

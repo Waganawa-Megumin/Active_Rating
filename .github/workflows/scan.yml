@@ -1,0 +1,35 @@
+name: scan
+on:
+  schedule:
+    # 00:00 UTC = 09:00 JST daily
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      offline:
+        description: 'Use fixtures instead of live adapters (safe dry-run against prod ingest)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: active-rating-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: build scanner
+        run: npm run build -w scanner
+      - name: run scan
+        run: node scanner/dist/cli.js ${{ (github.event_name == 'workflow_dispatch' && inputs.offline) && '--offline' || '' }}
+        env:
+          INGEST_HMAC_SECRET: ${{ secrets.INGEST_HMAC_SECRET }}
+          AR_INGEST_URL: ${{ secrets.AR_INGEST_URL }}
+          # Live adapters are read-only / passive-safe; active techniques run only
+          # against active_confirmed self/subsidiary targets (enforced in code).

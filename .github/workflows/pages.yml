@@ -1,0 +1,71 @@
+name: pages
+
+# Deploy the dashboard (pages/) to GitHub Pages. The app is a static SPA that
+# talks to the live Cloudflare Worker API; all data is admin-token gated, so the
+# public Pages shell exposes nothing without login.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/active-rating-app-kqqov5, main]
+    paths:
+      - 'pages/**'
+      - 'shared/**'
+      - '.github/workflows/pages.yml'
+      - 'deploy/state.env'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Resolve worker API base
+        id: api
+        run: |
+          set -a
+          [ -f deploy/state.env ] && . deploy/state.env
+          set +a
+          URL="${AR_WORKER_URL:-https://active-rating.southern-all-stars-love-peace.workers.dev}"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "worker API: $URL"
+
+      - name: Build dashboard (base=/Active_Rating/)
+        run: npm run build -w pages
+        env:
+          PAGES_BASE: /Active_Rating/
+          VITE_API_BASE: ${{ steps.api.outputs.url }}
+
+      - name: SPA + Jekyll guards
+        run: |
+          cp pages/dist/index.html pages/dist/404.html
+          touch pages/dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

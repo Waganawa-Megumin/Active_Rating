@@ -42,6 +42,13 @@ function req(path: string, init?: RequestInit): Request {
   return new Request(`http://localhost${path}`, init);
 }
 
+// Authenticated GET for the admin-gated /api/* routes.
+function apiReq(path: string): Request {
+  return new Request(`http://localhost${path}`, {
+    headers: { authorization: `Bearer ${ADMIN}` },
+  });
+}
+
 async function signedIngest(payload: IngestPayload): Promise<Request> {
   const body = new TextEncoder().encode(JSON.stringify(payload));
   const headers = await signRequest({ secret: SECRET, method: 'POST', path: '/ingest', bodyBytes: body });
@@ -81,8 +88,12 @@ describe('HTTP routes (real Hono app, in-process)', () => {
     expect(domRes.status).toBe(200);
     const dom = (await domRes.json()) as { id: string };
 
-    // enrollment feed reflects the registration
-    const enr = (await (await app.fetch(req('/api/enrollment'), env)).json()) as unknown[];
+    // /api/* is admin-gated: no token -> 401
+    const noAuthApi = await app.fetch(req('/api/enrollment'), env);
+    expect(noAuthApi.status).toBe(401);
+
+    // enrollment feed reflects the registration (with token)
+    const enr = (await (await app.fetch(apiReq('/api/enrollment'), env)).json()) as unknown[];
     expect(enr.length).toBe(1);
 
     // signed ingest with one subdomain -> ADDED
@@ -109,7 +120,7 @@ describe('HTTP routes (real Hono app, in-process)', () => {
     expect(body.added).toBe(1);
 
     // rating aggregate is available
-    const rating = (await (await app.fetch(req(`/api/rating/${org.id}`), env)).json()) as {
+    const rating = (await (await app.fetch(apiReq(`/api/rating/${org.id}`), env)).json()) as {
       score: number;
       assets: { total: number };
     };

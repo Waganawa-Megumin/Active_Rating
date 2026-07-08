@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, type Change, type FpRate, type Org, type Rating } from './api/client.js';
+import { api, AuthError, type Change, type FpRate, type Org, type Rating } from './api/client.js';
+import { Login } from './components/Login.js';
 import { RatingGauge } from './components/RatingGauge.js';
 import { CsfRadar } from './components/CsfRadar.js';
 import { OrgTree } from './components/OrgTree.js';
@@ -13,6 +14,7 @@ import { MttdRace, WorldMap, AttackPath } from './components/Stubs.js';
 type Tab = 'dashboard' | 'targets';
 
 export function App() {
+  const [authed, setAuthed] = useState<boolean>(() => api.hasToken());
   const [tab, setTab] = useState<Tab>('dashboard');
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
@@ -37,18 +39,25 @@ export function App() {
       setError(null);
       setSelectedOrg((prev) => prev ?? o.find((x) => x.relation_type === 'self')?.id ?? o[0]?.id ?? null);
     } catch (e) {
-      setError(`${api.base} に接続できません。worker を起動してください（npm run dev:worker）。`);
+      if (e instanceof AuthError) {
+        api.logout();
+        setAuthed(false);
+        return;
+      }
+      setError(`${api.base} に接続できません。`);
     }
   }, []);
 
   useEffect(() => {
-    void loadBase();
-  }, [loadBase]);
+    if (authed) void loadBase();
+  }, [authed, loadBase]);
 
   useEffect(() => {
     if (!selectedOrg) return;
     api.rating(selectedOrg).then(setRating).catch(() => setRating(null));
   }, [selectedOrg, changes.length]);
+
+  if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
 
   return (
     <div className="app">
@@ -70,6 +79,14 @@ export function App() {
         </button>
         <button onClick={() => void loadBase()} style={{ marginLeft: 'auto' }}>
           ⟳ 更新
+        </button>
+        <button
+          onClick={() => {
+            api.logout();
+            setAuthed(false);
+          }}
+        >
+          ログアウト
         </button>
       </div>
 

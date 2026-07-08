@@ -1,8 +1,10 @@
 // Active Rating — read-only /api/* for the dashboard + /api/enrollment for the
-// scanner. No auth in P1 (front the deployment with Cloudflare Access); never
-// exposes secrets.
+// scanner. Admin-only: every /api/* route (except /api/health) requires the
+// ADMIN_TOKEN bearer, so a publicly-hosted dashboard (GitHub Pages) exposes no
+// data without login. Never exposes secrets.
 
 import { Hono } from 'hono';
+import { timingSafeEqualHex } from '@ar/shared';
 import type { Bindings } from '../env.js';
 import {
   listOrgs,
@@ -22,7 +24,26 @@ import type { Severity } from '@ar/shared';
 
 export const apiRoute = new Hono<{ Bindings: Bindings }>();
 
+const toHex = (s: string) =>
+  Array.from(new TextEncoder().encode(s), (b) => b.toString(16).padStart(2, '0')).join('');
+
+// Public endpoints (no auth): health probe only.
+const PUBLIC_PATHS = new Set(['/api/health']);
+
+apiRoute.use('/api/*', async (c, next) => {
+  if (PUBLIC_PATHS.has(c.req.path)) return next();
+  const auth = c.req.header('authorization') ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!c.env.ADMIN_TOKEN || !timingSafeEqualHex(toHex(token), toHex(c.env.ADMIN_TOKEN))) {
+    return c.text('unauthorized', 401);
+  }
+  await next();
+});
+
 apiRoute.get('/api/health', (c) => c.json({ ok: true, offline: c.env.OFFLINE === '1' }));
+
+// Login validation: returns 200 only when the bearer matches (protected above).
+apiRoute.get('/api/session', (c) => c.json({ ok: true }));
 
 // Org tree (with profile derivation for badges).
 apiRoute.get('/api/organizations', async (c) => {

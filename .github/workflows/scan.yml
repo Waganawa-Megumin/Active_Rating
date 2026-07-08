@@ -41,5 +41,7 @@ jobs:
           node scanner/dist/cli.js ${{ (github.event_name == 'workflow_dispatch' && inputs.offline) && '--offline' || '' }}
         env:
           INGEST_HMAC_SECRET: ${{ secrets.INGEST_HMAC_SECRET }}
+          # Enrollment reads are admin-gated; the scanner authenticates with this.
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
           # Live adapters are read-only / passive-safe; active techniques run only
           # against active_confirmed self/subsidiary targets (enforced in code).

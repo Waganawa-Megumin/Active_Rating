@@ -4,7 +4,6 @@ import { api, type Org } from '../api/client.js';
 // Target-asset REGISTRATION UI (Phase 1). Adds/edit orgs + domains via the
 // authenticated Admin API. The active_confirmed gate is surfaced explicitly.
 export function TargetsAdmin({ orgs, onChanged }: { orgs: Org[]; onChanged: () => void }) {
-  const [token, setToken] = useState('');
   const [name, setName] = useState('');
   const [relation, setRelation] = useState('self');
   const [parent, setParent] = useState('');
@@ -20,8 +19,7 @@ export function TargetsAdmin({ orgs, onChanged }: { orgs: Org[]; onChanged: () =
 
   async function submitOrg(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) return setMsg({ ok: false, text: 'ADMIN_TOKEN を入力してください' });
-    const res = await api.registerOrg(token, {
+    const res = await api.registerOrg({
       name,
       parent_id: parent || null,
       relation_type: relation,
@@ -42,8 +40,7 @@ export function TargetsAdmin({ orgs, onChanged }: { orgs: Org[]; onChanged: () =
 
   async function submitDomain(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) return setMsg({ ok: false, text: 'ADMIN_TOKEN を入力してください' });
-    const res = await api.registerDomain(token, { org_id: domOrg, fqdn, enabled: true });
+    const res = await api.registerDomain({ org_id: domOrg, fqdn, enabled: true });
     setMsg({ ok: res.ok, text: res.ok ? `ドメイン登録: ${fqdn}` : `失敗 HTTP ${res.status}` });
     if (res.ok) {
       setFqdn('');
@@ -56,10 +53,6 @@ export function TargetsAdmin({ orgs, onChanged }: { orgs: Org[]; onChanged: () =
       <div className="panel">
         <h2>組織の登録 / 編集</h2>
         <form className="reg" onSubmit={submitOrg}>
-          <label>
-            ADMIN_TOKEN（Bearer）
-            <input value={token} onChange={(e) => setToken(e.target.value)} type="password" placeholder="wrangler secret ADMIN_TOKEN と同値" />
-          </label>
           <label>
             組織名
             <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="ACME Holdings" />

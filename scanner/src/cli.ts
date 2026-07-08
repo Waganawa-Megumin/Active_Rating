@@ -50,8 +50,9 @@ async function main() {
     process.exit(2);
   }
 
+  const apiToken = process.env.AR_API_TOKEN ?? process.env.ADMIN_TOKEN ?? '';
   console.log(`[scan] mode=${offline ? 'offline' : 'live'} api=${apiBase}`);
-  const enrollment = await loadEnrollment(apiBase);
+  const enrollment = await loadEnrollment(apiBase, apiToken);
   const targets = enrollment.filter(
     (d) =>
       (!args.org || d.organization_id.includes(args.org)) &&

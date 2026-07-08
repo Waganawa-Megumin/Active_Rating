@@ -14,9 +14,14 @@ import { handleReeval } from './queue.js';
 
 export const app = new Hono<{ Bindings: Bindings }>();
 
-// Dashboard is a separate origin (Pages) — allow read + admin from the browser.
-app.use('/api/*', cors());
-app.use('/admin/*', cors({ allowHeaders: ['authorization', 'content-type'] }));
+// Dashboard is a separate origin (GitHub Pages / Cloudflare Pages) — allow the
+// Authorization bearer from the browser on both read and admin routes.
+const corsOpts = {
+  allowHeaders: ['authorization', 'content-type'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+};
+app.use('/api/*', cors(corsOpts));
+app.use('/admin/*', cors(corsOpts));
 
 app.get('/', (c) => c.text('active-rating worker ok'));
 

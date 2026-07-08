@@ -13,8 +13,16 @@ const EnrollmentRowSchema = z.object({
   slack_channel: z.string().nullable().optional(),
 });
 
-export async function loadEnrollment(apiBase: string): Promise<EnrolledDomain[]> {
-  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/enrollment`);
+export async function loadEnrollment(
+  apiBase: string,
+  token?: string,
+): Promise<EnrolledDomain[]> {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/enrollment`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401) {
+    throw new Error('enrollment fetch: 401 unauthorized (set ADMIN_TOKEN / AR_API_TOKEN)');
+  }
   if (!res.ok) throw new Error(`enrollment fetch failed: HTTP ${res.status}`);
   const rows = z.array(EnrollmentRowSchema).parse(await res.json());
   return rows.map((r) => ({

@@ -10,24 +10,28 @@ binding = "DB"
 database_name = "active_rating"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
-# --- R2 (raw results / evidence snapshots) ---
-[[r2_buckets]]
-binding = "EVIDENCE"
-bucket_name = "active-rating-evidence"
-
-# --- Queue (event-driven pinpoint re-eval) ---
-[[queues.producers]]
-binding = "REEVAL_QUEUE"
-queue = "ar-reeval"
-
-[[queues.consumers]]
-queue = "ar-reeval"
-max_batch_size = 10
-max_retries = 3
-
 # --- Cron: CT/KEV poll + resend unnotified Slack (every 6h) ---
 [triggers]
 crons = ["0 */6 * * *"]
+
+# --- Optional paid-tier bindings (disabled by default to stay on the free tier) ---
+# R2 requires enabling R2 in the Cloudflare dashboard; Queues require the Workers
+# Paid plan. Evidence is stored inline in D1 (proof_json) until R2 is enabled, and
+# event-driven re-eval activates once the queue exists. To enable, uncomment and
+# re-run the deploy workflow.
+#
+# [[r2_buckets]]
+# binding = "EVIDENCE"
+# bucket_name = "active-rating-evidence"
+#
+# [[queues.producers]]
+# binding = "REEVAL_QUEUE"
+# queue = "ar-reeval"
+#
+# [[queues.consumers]]
+# queue = "ar-reeval"
+# max_batch_size = 10
+# max_retries = 3
 
 [vars]
 OFFLINE = "0"

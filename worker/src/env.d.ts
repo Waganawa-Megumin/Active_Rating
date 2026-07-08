@@ -2,7 +2,9 @@
 
 export interface Bindings {
   DB: D1Database;
-  EVIDENCE: R2Bucket;
+  // Optional paid-tier bindings (see wrangler.toml). Absent on the free tier:
+  // evidence falls back to inline proof_json in D1; re-eval queue is skipped.
+  EVIDENCE?: R2Bucket;
   REEVAL_QUEUE?: Queue<ReevalMessage>;
   // vars
   OFFLINE: string;

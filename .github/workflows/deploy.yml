@@ -53,17 +53,15 @@ jobs:
           [ -z "${{ secrets.ADMIN_TOKEN }}" ] && { echo "::error::missing secret ADMIN_TOKEN"; missing=1; }
           exit $missing
 
-      - name: Ensure D1 / R2 / Queue exist (idempotent)
+      - name: Ensure D1 exists (idempotent, free tier)
         working-directory: worker
-        run: |
-          npx wrangler d1 create active_rating || echo "d1 exists"
-          npx wrangler r2 bucket create active-rating-evidence || echo "r2 exists"
-          npx wrangler queues create ar-reeval || echo "queue exists"
+        run: npx wrangler d1 create active_rating || echo "d1 already exists"
 
       - name: Resolve D1 database_id into wrangler.toml
         working-directory: worker
         run: |
-          ID=$(npx wrangler d1 info active_rating --json | jq -r '.uuid // .database_id // empty')
+          # Resolve by name via `d1 list` (does NOT read the toml placeholder).
+          ID=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="active_rating") | .uuid' | head -1)
           if [ -z "$ID" ]; then echo "::error::could not resolve D1 id"; exit 1; fi
           echo "resolved D1 id: $ID"
           sed -i "s/REPLACE_WITH_D1_DATABASE_ID/$ID/" wrangler.toml

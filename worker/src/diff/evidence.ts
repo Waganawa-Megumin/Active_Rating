@@ -41,15 +41,20 @@ export async function buildEvidence(
   };
   const proofJson = canonicalJson(proof);
 
-  // Persist the full proof snapshot in R2 (best-effort; the row still records it).
-  const snapshotRef = `evidence/${input.asset_id}/${id}.json`;
-  try {
-    await env.EVIDENCE.put(snapshotRef, proofJson, {
-      httpMetadata: { contentType: 'application/json' },
-    });
-  } catch {
-    // R2 unavailable (e.g. binding missing in a minimal local run) — the
-    // evidence row still carries proof_json inline, so nothing is lost.
+  // Persist the full proof snapshot in R2 when available (best-effort). On the
+  // free tier R2 is not bound; the evidence row still carries proof_json inline,
+  // so nothing is lost.
+  let snapshotRef: string | null = null;
+  if (env.EVIDENCE) {
+    const key = `evidence/${input.asset_id}/${id}.json`;
+    try {
+      await env.EVIDENCE.put(key, proofJson, {
+        httpMetadata: { contentType: 'application/json' },
+      });
+      snapshotRef = key;
+    } catch {
+      snapshotRef = null;
+    }
   }
 
   const sourcesJson = JSON.stringify([input.entity.entity_type]);

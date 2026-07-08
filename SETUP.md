@@ -1,98 +1,83 @@
-# SETUP — ガイド付きプロビジョニング手順
+# SETUP — 全自動デプロイ（CLI操作なし）
 
-本番デプロイに必要な外部リソース（Cloudflare / GitHub / API キー）を、**ローカル検証を先に済ませてから**
-順番に用意する。各フェーズの「あなたの操作」を実施し、出力の値を指定箇所に貼り付けていく。
+デプロイ・スキャンは **GitHub Actions 上で全自動**で実行される（`deploy.yml` / `scan.yml`）。
+あなたの作業は **GitHub のリポジトリ設定画面でシークレットを数個ペーストするだけ**（CLI 不要）。
+それ以外（D1/R2/Queue 作成、schema 適用、worker/pages デプロイ、対象登録、定期スキャン）は
+ワークフローが自動で行う。デプロイ失敗時のログ確認・修正は担当（Claude）が CI 経由で回す。
 
 ---
 
-## Phase A — ローカル検証（アカウント不要）
+## あなたの唯一の作業 — リポジトリ Secrets を登録
+
+GitHub リポジトリ → **Settings → Secrets and variables → Actions → New repository secret** で以下を追加:
+
+| Secret | 値 | 取得元 |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API トークン | Cloudflare ダッシュボード → My Profile → API Tokens。権限: Workers Scripts / D1 / R2 / Queues / Pages を **Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | アカウントID | Cloudflare ダッシュボード右サイドバー |
+| `INGEST_HMAC_SECRET` | 署名鍵（担当が生成した値を貼付） | チャットで共有 |
+| `ADMIN_TOKEN` | 登録API用トークン（担当が生成した値を貼付） | チャットで共有 |
+| `SLACK_WEBHOOK_URL` | （任意）Slack Incoming Webhook | Slack App → Incoming Webhooks |
+
+> `CLOUDFLARE_API_TOKEN` はセキュリティ上こちら（Claude）が保持すべきでないため、あなたのアカウントから
+> 発行して GitHub Secret に貼ってください。`INGEST_HMAC_SECRET` / `ADMIN_TOKEN` の値は担当が生成して渡します。
+
+登録後は担当が `deploy` ワークフローを起動し、成功するまで面倒を見る。あなたのCLI操作は不要。
+
+---
+
+## 自動実行される内容（`deploy.yml`）
+
+1. D1 (`active_rating`) / R2 (`active-rating-evidence`) / Queue (`ar-reeval`) を冪等に作成
+2. D1 `database_id` を解決して `wrangler.toml` に注入
+3. リモート D1 に全DDL（`schema.sql`）を適用
+4. worker シークレット（HMAC / ADMIN / Slack）を設定
+5. worker をデプロイし、公開URL（`*.workers.dev`）を取得
+6. `targets.yaml` を Admin API 経由で登録
+7. ダッシュボード（Pages）をビルド＆デプロイ
+8. 取得した worker URL を `deploy/state.env` にコミット（定期スキャンが参照）
+
+## 定期スキャン（`scan.yml`）
+
+- 毎日 09:00 JST に自動実行。`deploy/state.env` の URL を使い、署名付きで `/ingest` に投入。
+- `workflow_dispatch` で手動起動も可（`offline=true` で fixtures ドライラン）。
+
+## CI（`ci.yml`）
+
+- push/PR で typecheck・test（38件・オフライン）・build を自動実行。シークレット不要。
+
+---
+
+## ダッシュボードの閲覧・保護
+
+- Pages デプロイ後、`active-rating` プロジェクトのURLで閲覧可能。
+- 経営/アナリスト向けに **Cloudflare Access**（無料枠）で保護推奨。
+- 追加の対象登録は「Targets / 登録」タブから（`ADMIN_TOKEN` を入力）、または `targets.yaml` を編集して push
+  （deploy 時に自動反映）。
+
+---
+
+## ローカルで動かしたい場合（任意・参考）
+
+`workerd` が動くマシンなら `scripts/verify-e2e.sh` でローカル一気通貫も可能:
 
 ```bash
 npm install
-npm run db:apply:local -w worker
-npm run seed:local     -w worker
-npm test                     # 38 tests green
-npm run build                # scanner + pages
+npm run db:apply:local -w worker && npm run seed:local -w worker
+INGEST_HMAC_SECRET=dev ADMIN_TOKEN=dev SLACK_ENABLED=0 OFFLINE=1 npm run dev:worker
+# 別ターミナル
+ADMIN_TOKEN=dev npm run register -w scanner -- --file ../targets.yaml --api http://localhost:8787
+INGEST_HMAC_SECRET=dev AR_INGEST_URL=http://localhost:8787/ingest npm run scan -w scanner -- --offline
+VITE_API_BASE=http://localhost:8787 npm run dev:pages
 ```
 
-- `workerd` が動く環境なら `scripts/verify-e2e.sh` で スキャン→差分→レーティング まで一括確認できる。
-- **ここで「アカウント無しでもパイプラインが動く」ことを確認**してから次へ。
-
 ---
 
-## Phase B — GitHub（リポジトリのみ）
+## 後続フェーズで追加提供いただく鍵（都度ガイド）
 
-1. リポジトリを作成し push。
-2. `.github/workflows/ci.yml` が自動実行され、**secret 無しで緑**になることを確認（テストは全てオフライン）。
-
----
-
-## Phase C — Cloudflare（あなたのアカウント）
-
-> 各コマンドの後、私が「次にこれを実行 / この値をここへ」と案内します。
-
-1. Cloudflare アカウント作成 → `npx wrangler login`（ブラウザで OAuth）。
-2. `npx wrangler d1 create active_rating`
-   → 出力の **`database_id`** を `worker/wrangler.toml` の `[[d1_databases]].database_id` に貼付。
-3. `npm run db:apply:remote -w worker`（リモート D1 に全DDL適用）。
-4. `npx wrangler r2 bucket create active-rating-evidence`
-5. `npx wrangler queues create ar-reeval`
-6. 署名鍵を生成しシークレット登録:
-   ```bash
-   openssl rand -hex 32                       # 出力を控える（GitHub にも使う）
-   npx wrangler secret put INGEST_HMAC_SECRET # 上の値を貼付
-   ```
-7. `npx wrangler secret put ADMIN_TOKEN`（登録 Admin API 用の任意トークン）。
-8. Slack Incoming Webhook を作成 → `npx wrangler secret put SLACK_WEBHOOK_URL`。
-9. `npm run deploy -w worker` → デプロイ先 `https://active-rating.<subdomain>.workers.dev` を控える。
-
----
-
-## Phase D — GitHub Actions Secrets（あなたのリポジトリ）
-
-リポジトリ → Settings → Secrets and variables → Actions に登録:
-
-| Secret | 値 |
+| Phase | 鍵/リソース |
 |---|---|
-| `INGEST_HMAC_SECRET` | Phase C-6 と**同一**の 32byte hex |
-| `AR_INGEST_URL` | `https://active-rating.<subdomain>.workers.dev/ingest` |
-
-その後、まず対象を登録:
-```bash
-ADMIN_TOKEN=<Phase C-7の値> \
-  npm run register -w scanner -- --file targets.yaml --api https://active-rating.<subdomain>.workers.dev
-```
-次に `scan.yml` を Actions から `workflow_dispatch`:
-- 初回は `offline=true`（本番 ingest への安全な dry-run）。
-- 問題なければ `offline=false`（実 crt.sh スキャン）。
-- デプロイ済み worker の `/api/changes` と Slack 通知を確認。
-
----
-
-## Phase E — ダッシュボード（Cloudflare Pages）
-
-```bash
-VITE_API_BASE=https://active-rating.<subdomain>.workers.dev npm run build -w pages
-npx wrangler pages deploy pages/dist
-```
-
-- 経営/アナリスト向けに **Cloudflare Access** で保護（無料枠）。
-- 「Targets / 登録」タブから追加登録も可能（`ADMIN_TOKEN` を入力）。
-
----
-
-## 単一 HMAC 鍵の要点
-
-`INGEST_HMAC_SECRET` は **1回生成し 2箇所**（worker secret ＝ Phase C-6、GitHub secret ＝ Phase D）に
-**同じ値**を入れる。これで scanner の署名と worker の検証が一致する。`ADMIN_TOKEN` は登録系専用で別物。
-
----
-
-## 後続フェーズで追加提供いただくもの（都度ガイド）
-
-| Phase | 必要な鍵/リソース |
-|---|---|
-| P3 | IntelX・HIBP、テストID/RoE 運用 |
+| P3 | IntelX・HIBP、テストID/RoE |
 | P4 | VT/GTI・DomainTools、（重大時）Recorded Future / Intel471 / CYFIRMA / BitSight |
-| P5 | Anthropic・OpenAI（ダブルLLM。数値は決定論、LLM は批評のみ） |
-| P6 | MaxMind・urlscan（Geo/魚拓） |
+| P5 | Anthropic・OpenAI（数値は決定論、LLM は批評のみ） |
+| P6 | MaxMind・urlscan |

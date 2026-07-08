@@ -27,9 +27,19 @@ jobs:
       - name: build scanner
         run: npm run build -w scanner
       - name: run scan
-        run: node scanner/dist/cli.js ${{ (github.event_name == 'workflow_dispatch' && inputs.offline) && '--offline' || '' }}
+        run: |
+          # Prefer the worker URL persisted by the deploy workflow; fall back to a secret.
+          set -a
+          [ -f deploy/state.env ] && . deploy/state.env
+          set +a
+          : "${AR_INGEST_URL:=${{ secrets.AR_INGEST_URL }}}"
+          if [ -z "$AR_INGEST_URL" ]; then
+            echo "::error::AR_INGEST_URL not set (run the deploy workflow first, or set the secret)"; exit 1
+          fi
+          echo "ingest: $AR_INGEST_URL"
+          export AR_INGEST_URL
+          node scanner/dist/cli.js ${{ (github.event_name == 'workflow_dispatch' && inputs.offline) && '--offline' || '' }}
         env:
           INGEST_HMAC_SECRET: ${{ secrets.INGEST_HMAC_SECRET }}
-          AR_INGEST_URL: ${{ secrets.AR_INGEST_URL }}
           # Live adapters are read-only / passive-safe; active techniques run only
           # against active_confirmed self/subsidiary targets (enforced in code).

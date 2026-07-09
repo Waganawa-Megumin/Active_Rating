@@ -26,6 +26,7 @@ import {
   upsertAsset,
   type AssetRow,
 } from '../db/queries.js';
+import { batchChunked } from '../db/batch.js';
 import { buildEvidence, methodFor } from './evidence.js';
 
 export interface DiffSummary {
@@ -232,6 +233,6 @@ export async function runDiff(
     }),
   );
 
-  if (stmts.length > 0) await env.DB.batch(stmts);
+  await batchChunked(env.DB, stmts);
   return summary;
 }

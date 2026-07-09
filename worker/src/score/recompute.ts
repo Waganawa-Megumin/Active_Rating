@@ -13,6 +13,7 @@ import {
   replaceFrameworkStmts,
   insertOverall,
 } from '../db/queries.js';
+import { batchChunked } from '../db/batch.js';
 
 const SEV_SCORE: Record<Severity, number> = { info: 1, low: 3, med: 5, high: 8, critical: 9.5 };
 
@@ -84,6 +85,6 @@ export async function recomputeOrg(
     }),
   );
 
-  if (stmts.length) await env.DB.batch(stmts);
+  await batchChunked(env.DB, stmts);
   return evaluation;
 }

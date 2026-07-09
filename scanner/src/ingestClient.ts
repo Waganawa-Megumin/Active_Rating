@@ -57,11 +57,17 @@ export async function postIngest(opts: {
     bodyBytes,
   });
   const res = await fetch(opts.ingestUrl, { method: 'POST', headers, body: bodyBytes });
-  let body: unknown;
-  try {
-    body = await res.json();
-  } catch {
-    body = await res.text();
+  // Read the body exactly once — a Response stream can't be re-read, so trying
+  // res.json() then res.text() throws "Body has already been read" and masks the
+  // real HTTP status. Read text, then parse it as JSON best-effort.
+  const text = await res.text();
+  let body: unknown = text;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      /* leave body as the raw text */
+    }
   }
   return { ok: res.ok, status: res.status, body };
 }

@@ -9,6 +9,7 @@ import type { Bindings } from '../env.js';
 import {
   listOrgs,
   listEnrollment,
+  listAllDomains,
   recentChanges,
   listAssets,
   getAsset,
@@ -79,6 +80,12 @@ apiRoute.get('/api/enrollment', async (c) => {
       slack_channel: r.slack_channel ?? null,
     })),
   );
+});
+
+// All registered domains (for the Targets management UI).
+apiRoute.get('/api/domains', async (c) => {
+  const rows = await listAllDomains(c.env.DB);
+  return c.json(rows.map((d) => ({ ...d, enabled: !!d.enabled })));
 });
 
 apiRoute.get('/api/changes', async (c) => {

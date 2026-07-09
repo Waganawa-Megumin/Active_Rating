@@ -59,6 +59,13 @@ export interface Org {
   profile: 'active' | 'passive';
 }
 
+export interface Domain {
+  id: string;
+  org_id: string;
+  fqdn: string;
+  enabled: boolean;
+}
+
 export interface Change {
   id: string;
   org_id: string;
@@ -115,6 +122,7 @@ export const api = {
   hasToken: () => getToken().length > 0,
   health: () => getJson<{ ok: boolean; offline: boolean }>('/api/health'),
   organizations: () => getJson<Org[]>('/api/organizations'),
+  domains: () => getJson<Domain[]>('/api/domains'),
   changes: (limit = 200) => getJson<Change[]>(`/api/changes?limit=${limit}`),
   assets: (limit = 500) => getJson<Array<Record<string, unknown>>>(`/api/assets?limit=${limit}`),
   rating: (orgId: string) => getJson<Rating>(`/api/rating/${orgId}`),
@@ -134,5 +142,19 @@ export const api = {
       body: JSON.stringify(body),
     });
     return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
+  },
+  async deleteOrg(id: string) {
+    const res = await fetch(`${API_BASE}/admin/orgs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return { ok: res.ok, status: res.status };
+  },
+  async deleteDomain(id: string) {
+    const res = await fetch(`${API_BASE}/admin/domains/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return { ok: res.ok, status: res.status };
   },
 };

@@ -120,8 +120,54 @@ export async function getDomain(db: D1Database, id: string): Promise<DomainRow |
   return db.prepare(`SELECT * FROM domains WHERE id = ?1`).bind(id).first<DomainRow>();
 }
 
-export async function deleteDomain(db: D1Database, id: string) {
-  return db.prepare(`DELETE FROM domains WHERE id = ?1`).bind(id).run();
+export async function listAllDomains(db: D1Database): Promise<DomainRow[]> {
+  const res = await db.prepare(`SELECT * FROM domains ORDER BY fqdn`).all<DomainRow>();
+  return res.results ?? [];
+}
+
+export async function orgChildCount(db: D1Database, id: string): Promise<number> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM organizations WHERE parent_id = ?1`)
+    .bind(id)
+    .first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
+
+/** Cascade-delete a domain and all data derived from it (FK-independent). */
+export function deleteDomainCascadeStmts(db: D1Database, id: string): D1PreparedStatement[] {
+  const p = (sql: string) => db.prepare(sql).bind(id);
+  return [
+    p(`DELETE FROM evidence_bundles WHERE asset_id IN (SELECT id FROM assets WHERE domain_id = ?1)`),
+    p(`DELETE FROM evidence_bundles WHERE change_id IN (SELECT id FROM changes WHERE domain_id = ?1)`),
+    p(`DELETE FROM disputes WHERE asset_id IN (SELECT id FROM assets WHERE domain_id = ?1)`),
+    p(`DELETE FROM changes WHERE domain_id = ?1`),
+    p(`DELETE FROM assets WHERE domain_id = ?1`),
+    p(`DELETE FROM snapshots WHERE domain_id = ?1`),
+    p(`DELETE FROM domains WHERE id = ?1`),
+  ];
+}
+
+/**
+ * Cascade-delete an org and everything under it (domains + scan data + scores).
+ * Child orgs are reparented to this org's parent so they are not orphaned.
+ */
+export function deleteOrgCascadeStmts(db: D1Database, id: string): D1PreparedStatement[] {
+  const p = (sql: string) => db.prepare(sql).bind(id);
+  return [
+    p(`UPDATE organizations SET parent_id = (SELECT parent_id FROM organizations WHERE id = ?1) WHERE parent_id = ?1`),
+    p(`DELETE FROM evidence_bundles WHERE asset_id IN (SELECT id FROM assets WHERE org_id = ?1)`),
+    p(`DELETE FROM evidence_bundles WHERE change_id IN (SELECT id FROM changes WHERE org_id = ?1)`),
+    p(`DELETE FROM disputes WHERE asset_id IN (SELECT id FROM assets WHERE org_id = ?1)`),
+    p(`DELETE FROM changes WHERE org_id = ?1`),
+    p(`DELETE FROM assets WHERE org_id = ?1`),
+    p(`DELETE FROM snapshots WHERE domain_id IN (SELECT id FROM domains WHERE org_id = ?1)`),
+    p(`DELETE FROM domains WHERE org_id = ?1`),
+    p(`DELETE FROM overall_ratings WHERE org_id = ?1`),
+    p(`DELETE FROM framework_scores WHERE org_id = ?1`),
+    p(`DELETE FROM attack_vectors WHERE org_id = ?1`),
+    p(`DELETE FROM bitsight_findings WHERE org_id = ?1`),
+    p(`DELETE FROM organizations WHERE id = ?1`),
+  ];
 }
 
 /** Enrollment view: enabled domains joined with their org for the scanner. */

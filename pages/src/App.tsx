@@ -123,11 +123,7 @@ export function App() {
           </div>
         </>
       ) : (
-        <>
-          <TargetsAdmin orgs={orgs} onChanged={loadBase} />
-          <div style={{ height: 16 }} />
-          <OrgTree orgs={orgs} onSelect={setSelectedOrg} selected={selectedOrg} />
-        </>
+        <TargetsAdmin orgs={orgs} onChanged={loadBase} />
       )}
     </div>
   );

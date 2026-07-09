@@ -157,6 +157,54 @@ describe('HTTP routes (real Hono app, in-process)', () => {
     expect(badToken.status).toBe(401);
   });
 
+  it('cascade-deletes an org with its domains and scan data', async () => {
+    const org = (await (
+      await app.fetch(
+        req('/admin/orgs', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${ADMIN}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ name: 'ACME', relation_type: 'self', active_confirmed: true }),
+        }),
+        env,
+      )
+    ).json()) as { id: string };
+    const dom = (await (
+      await app.fetch(
+        req('/admin/domains', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${ADMIN}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ org_id: org.id, fqdn: 'example.com' }),
+        }),
+        env,
+      )
+    ).json()) as { id: string };
+    await app.fetch(
+      await signedIngest({
+        schema_version: INGEST_SCHEMA_VERSION,
+        domain_id: dom.id,
+        organization_id: org.id,
+        source: { adapter: 'offline', is_authoritative: true, profile: 'active' },
+        run_at: '2026-07-08T00:00:00.000Z',
+        run_id: 'run-1',
+        entities: [
+          { entity_type: 'subdomain', identity: canonicalHost('api.example.com'), attributes: { resolves: true }, observed_at: '2026-07-08T00:00:00.000Z', signals: { source_count: 2 } },
+        ],
+      }),
+      env,
+    );
+    expect((rawDb.prepare('SELECT COUNT(*) c FROM assets').get() as { c: number }).c).toBe(1);
+
+    const del = await app.fetch(
+      req(`/admin/orgs/${org.id}`, { method: 'DELETE', headers: { authorization: `Bearer ${ADMIN}` } }),
+      env,
+    );
+    expect(del.status).toBe(200);
+    expect((rawDb.prepare('SELECT COUNT(*) c FROM organizations').get() as { c: number }).c).toBe(0);
+    expect((rawDb.prepare('SELECT COUNT(*) c FROM domains').get() as { c: number }).c).toBe(0);
+    expect((rawDb.prepare('SELECT COUNT(*) c FROM assets').get() as { c: number }).c).toBe(0);
+    expect((rawDb.prepare('SELECT COUNT(*) c FROM evidence_bundles').get() as { c: number }).c).toBe(0);
+  });
+
   it('rejects an ingest with a bad signature (401)', async () => {
     const payload: IngestPayload = {
       schema_version: INGEST_SCHEMA_VERSION,

@@ -15,11 +15,12 @@ import {
   upsertOrg,
   findOrgByName,
   listOrgs,
-  deleteOrg,
   upsertDomain,
   findDomain,
-  deleteDomain,
   tagAsset,
+  orgChildCount,
+  deleteOrgCascadeStmts,
+  deleteDomainCascadeStmts,
   type OrgRow,
 } from '../db/queries.js';
 
@@ -79,8 +80,10 @@ adminRoute.post('/admin/orgs', async (c) => {
 });
 
 adminRoute.delete('/admin/orgs/:id', async (c) => {
-  await deleteOrg(c.env.DB, c.req.param('id'));
-  return c.json({ ok: true });
+  const id = c.req.param('id');
+  const children = await orgChildCount(c.env.DB, id);
+  await c.env.DB.batch(deleteOrgCascadeStmts(c.env.DB, id));
+  return c.json({ ok: true, reparented_children: children });
 });
 
 // ---- domains ----
@@ -103,7 +106,7 @@ adminRoute.post('/admin/domains', async (c) => {
 });
 
 adminRoute.delete('/admin/domains/:id', async (c) => {
-  await deleteDomain(c.env.DB, c.req.param('id'));
+  await c.env.DB.batch(deleteDomainCascadeStmts(c.env.DB, c.req.param('id')));
   return c.json({ ok: true });
 });
 

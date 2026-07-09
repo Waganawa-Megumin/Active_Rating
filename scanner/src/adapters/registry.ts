@@ -5,6 +5,7 @@
 import type { Profile } from '@ar/shared';
 import type { Adapter } from './types.js';
 import { CrtShAdapter } from './crtsh.js';
+import { AnubisAdapter } from './anubis.js';
 import { EmailAuthAdapter } from './email.js';
 import { OfflineAdapter } from './offline.js';
 
@@ -17,7 +18,8 @@ export function getAdapters(profile: Profile, opts: RegistryOptions): Adapter[] 
   if (opts.offline) return [new OfflineAdapter()];
 
   const all: Adapter[] = [
-    new CrtShAdapter(),
+    new CrtShAdapter(), // CT subdomains + certs
+    new AnubisAdapter(), // 2nd independent subdomain source
     new EmailAuthAdapter(), // passive DNS: SPF/DMARC/MTA-STS
     // Phase 4+: new IntelxAdapter(), new ShodanAdapter(), new HibpAdapter(), ...
   ];

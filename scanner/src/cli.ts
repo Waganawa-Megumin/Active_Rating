@@ -10,6 +10,7 @@
 //
 // Flags: --offline  --org <substr>  --domain <substr>  --dry-run
 
+import type { NormalizedEntity } from '@ar/shared';
 import {
   buildPayload,
   postIngest,
@@ -17,6 +18,44 @@ import {
 import { loadEnrollment } from './orgtree.js';
 import { profileFor, assertAllowed } from './profile.js';
 import { getAdapters } from './adapters/registry.js';
+
+type MergeBucket = Map<string, { e: NormalizedEntity; sources: Set<string> }>;
+
+/** Merge one entity into the per-domain bucket, tracking distinct sources. */
+function mergeEntity(byKey: MergeBucket, e: NormalizedEntity, source: string): void {
+  const key = `${e.entity_type}\x1f${e.identity}`;
+  const cur = byKey.get(key);
+  if (!cur) {
+    byKey.set(key, {
+      e: { ...e, attributes: { ...e.attributes }, signals: { ...(e.signals ?? {}) } },
+      sources: new Set([source]),
+    });
+    return;
+  }
+  cur.sources.add(source);
+  // fill missing attributes; keep first-seen values
+  cur.e.attributes = { ...e.attributes, ...cur.e.attributes };
+  const s = cur.e.signals ?? {};
+  const es = e.signals ?? {};
+  cur.e.signals = {
+    ...s,
+    active_resolved: Boolean(s.active_resolved || es.active_resolved),
+    in_owned_asn: Boolean(s.in_owned_asn || es.in_owned_asn),
+    not_wildcard: Boolean(s.not_wildcard || es.not_wildcard),
+    cert_org_match: Boolean(s.cert_org_match || es.cert_org_match),
+  };
+  if (e.observed_at > cur.e.observed_at) cur.e.observed_at = e.observed_at;
+}
+
+/** Finalize merged entities, setting source_count = number of distinct sources. */
+function finalizeMerge(byKey: MergeBucket): NormalizedEntity[] {
+  const out: NormalizedEntity[] = [];
+  for (const { e, sources } of byKey.values()) {
+    e.signals = { ...(e.signals ?? {}), source_count: sources.size };
+    out.push(e);
+  }
+  return out;
+}
 
 interface Args {
   offline: boolean;
@@ -69,42 +108,54 @@ async function main() {
     const profile = profileFor(domain.relation_type, domain.active_confirmed);
     const adapters = getAdapters(profile, { offline });
 
+    // Run every profile-legal source, then MERGE by identity so multi-source
+    // corroboration raises confidence (design v0.2 §B). One snapshot per domain.
+    const collected: Array<{ name: string; authoritative: boolean }> = [];
+    let merged: NormalizedEntity[] = [];
+    const byKey = new Map<string, { e: NormalizedEntity; sources: Set<string> }>();
+
     for (const adapter of adapters) {
       try {
         assertAllowed(adapter, profile); // code-level active-scan guard
         const entities = await adapter.fetch(domain, profile);
-        const payload = buildPayload({
-          domain,
-          adapter: adapter.name,
-          authoritative: adapter.authoritative,
-          profile,
-          entities,
-        });
-
-        if (args.dryRun) {
-          console.log(
-            `[dry-run] ${domain.fqdn} via ${adapter.name} (${profile}) — ${entities.length} entities`,
-          );
-          continue;
-        }
-
-        const result = await postIngest({ ingestUrl, secret, payload });
-        if (result.ok && typeof result.body === 'object' && result.body) {
-          const b = result.body as Record<string, number>;
-          totalAdded += b.added ?? 0;
-          totalChanged += b.changed ?? 0;
-          totalRemoved += b.removed ?? 0;
-          console.log(
-            `[ok] ${domain.fqdn} via ${adapter.name} (${profile}) — +${b.added ?? 0} ~${b.changed ?? 0} -${b.removed ?? 0} =${b.unchanged ?? 0}`,
-          );
-        } else {
-          failures++;
-          console.error(`[fail] ${domain.fqdn} via ${adapter.name}: HTTP ${result.status}`, result.body);
-        }
+        collected.push({ name: adapter.name, authoritative: adapter.authoritative });
+        for (const e of entities) mergeEntity(byKey, e, adapter.name);
       } catch (err) {
         failures++;
         console.error(`[error] ${domain.fqdn} via ${adapter.name}:`, (err as Error).message);
       }
+    }
+    if (collected.length === 0) continue;
+
+    merged = finalizeMerge(byKey);
+    const sources = collected.map((c) => c.name);
+    // Authoritative (drives REMOVED) only when a single authoritative source ran
+    // (e.g. offline fixtures); merged passive sources are additive.
+    const authoritative = collected.length === 1 && collected[0]!.authoritative;
+
+    if (args.dryRun) {
+      console.log(`[dry-run] ${domain.fqdn} via ${sources.join('+')} (${profile}) — ${merged.length} merged entities`);
+      continue;
+    }
+
+    try {
+      const payload = buildPayload({ domain, adapter: sources.join('+'), authoritative, profile, entities: merged });
+      const result = await postIngest({ ingestUrl, secret, payload });
+      if (result.ok && typeof result.body === 'object' && result.body) {
+        const b = result.body as Record<string, number>;
+        totalAdded += b.added ?? 0;
+        totalChanged += b.changed ?? 0;
+        totalRemoved += b.removed ?? 0;
+        console.log(
+          `[ok] ${domain.fqdn} via ${sources.join('+')} (${profile}) — ${merged.length} assets · +${b.added ?? 0} ~${b.changed ?? 0} -${b.removed ?? 0} =${b.unchanged ?? 0}`,
+        );
+      } else {
+        failures++;
+        console.error(`[fail] ${domain.fqdn}: HTTP ${result.status}`, result.body);
+      }
+    } catch (err) {
+      failures++;
+      console.error(`[error] ${domain.fqdn} ingest:`, (err as Error).message);
     }
   }
 

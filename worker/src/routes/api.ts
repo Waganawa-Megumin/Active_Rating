@@ -19,7 +19,12 @@ import {
   disputeStats,
   orgAssetSummary,
   orgSeveritySummary,
+  listFindings,
+  latestOveralls,
+  listVectors,
+  listFrameworkCsf,
 } from '../db/queries.js';
+import { ALL_VECTORS } from '@ar/shared';
 import { computeProvisionalRating } from '../score/provisional.js';
 import type { Severity } from '@ar/shared';
 
@@ -129,27 +134,58 @@ apiRoute.get('/api/fp-rate', async (c) => {
   });
 });
 
-// Provisional Active Rating gauge + CSF radar for an org.
+// Active Rating gauge + CSF radar + vector grades for an org (deterministic,
+// persisted by the evaluation step). Falls back to a provisional estimate when
+// no evaluation has run yet.
 apiRoute.get('/api/rating/:orgId', async (c) => {
   const orgId = c.req.param('orgId');
   const assetSummary = await orgAssetSummary(c.env.DB, orgId);
-  const sevSummary = await orgSeveritySummary(c.env.DB, orgId);
-
   let total = 0;
   let confirmed = 0;
   for (const r of assetSummary) {
     total += Number(r.n ?? 0);
     confirmed += Number(r.confirmed ?? 0);
   }
-  const severityCounts: Partial<Record<Severity, number>> = {};
-  for (const r of sevSummary) severityCounts[r.severity as Severity] = Number(r.n ?? 0);
 
-  const rating = computeProvisionalRating({
-    totalAssets: total,
-    confirmedAssets: confirmed,
-    severityCounts,
+  const overalls = await latestOveralls(c.env.DB, orgId, 2);
+  if (overalls.length === 0) {
+    // no evaluation yet — provisional estimate
+    const sevSummary = await orgSeveritySummary(c.env.DB, orgId);
+    const severityCounts: Partial<Record<Severity, number>> = {};
+    for (const r of sevSummary) severityCounts[r.severity as Severity] = Number(r.n ?? 0);
+    const rating = computeProvisionalRating({ totalAssets: total, confirmedAssets: confirmed, severityCounts });
+    return c.json({ org_id: orgId, assets: { total, confirmed }, ...rating });
+  }
+
+  const latest = overalls[0]!;
+  const prev = overalls[1];
+  const vRows = await listVectors(c.env.DB, orgId);
+  const vMap = new Map(vRows.map((v) => [v.vector, v]));
+  const vectors = ALL_VECTORS.map(
+    (vector) => vMap.get(vector) ?? { vector, grade: 'A', score: 100 },
+  );
+  const csfRows = await listFrameworkCsf(c.env.DB, orgId);
+  const csf: Record<string, number> = { GV: 0, ID: 0, PR: 0, DE: 0, RS: 0, RC: 0 };
+  for (const r of csfRows) csf[r.function_or_control] = Number(r.score);
+
+  return c.json({
+    org_id: orgId,
+    score: latest.score,
+    grade: latest.grade,
+    confidence: latest.confidence,
+    trend: prev ? Math.round(latest.score - prev.score) : 0,
+    csf,
+    vectors,
+    assets: { total, confirmed },
+    provisional: false,
   });
-  return c.json({ org_id: orgId, assets: { total, confirmed }, severityCounts, ...rating });
+});
+
+// Top findings requiring action (with SLA + asset identity) for the drill-down.
+apiRoute.get('/api/findings', async (c) => {
+  const limit = Math.min(500, Number(c.req.query('limit') ?? 100));
+  const orgId = c.req.query('org') ?? null;
+  return c.json(await listFindings(c.env.DB, orgId, limit));
 });
 
 function safeJson(s: string): unknown {

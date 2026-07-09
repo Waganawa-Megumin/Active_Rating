@@ -55,9 +55,18 @@ export function RatingGauge({ rating }: { rating: Rating | null }) {
               確定資産 {rating.assets.confirmed}/{rating.assets.total} ・ 帰属確度で加重
             </div>
           )}
+          {rating && typeof rating.trend === 'number' && rating.trend !== 0 && (
+            <div className="gauge-sub">
+              前回比{' '}
+              <span style={{ color: rating.trend > 0 ? 'var(--accent)' : 'var(--sev-high)', fontWeight: 700 }}>
+                {rating.trend > 0 ? '▲ +' : '▼ '}
+                {rating.trend}
+              </span>
+            </div>
+          )}
           {rating?.provisional && (
             <div className="provisional">
-              ※ 暫定値（P1）。framework/vector/overall・ダブルLLMはP5で確定
+              ※ 暫定値。スキャン実行で framework/vector/overall が確定します
             </div>
           )}
         </div>

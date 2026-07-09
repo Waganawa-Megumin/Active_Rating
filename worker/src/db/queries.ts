@@ -139,6 +139,7 @@ export function deleteDomainCascadeStmts(db: D1Database, id: string): D1Prepared
   return [
     p(`DELETE FROM evidence_bundles WHERE asset_id IN (SELECT id FROM assets WHERE domain_id = ?1)`),
     p(`DELETE FROM evidence_bundles WHERE change_id IN (SELECT id FROM changes WHERE domain_id = ?1)`),
+    p(`DELETE FROM findings WHERE asset_id IN (SELECT id FROM assets WHERE domain_id = ?1)`),
     p(`DELETE FROM disputes WHERE asset_id IN (SELECT id FROM assets WHERE domain_id = ?1)`),
     p(`DELETE FROM changes WHERE domain_id = ?1`),
     p(`DELETE FROM assets WHERE domain_id = ?1`),
@@ -157,6 +158,7 @@ export function deleteOrgCascadeStmts(db: D1Database, id: string): D1PreparedSta
     p(`UPDATE organizations SET parent_id = (SELECT parent_id FROM organizations WHERE id = ?1) WHERE parent_id = ?1`),
     p(`DELETE FROM evidence_bundles WHERE asset_id IN (SELECT id FROM assets WHERE org_id = ?1)`),
     p(`DELETE FROM evidence_bundles WHERE change_id IN (SELECT id FROM changes WHERE org_id = ?1)`),
+    p(`DELETE FROM findings WHERE org_id = ?1`),
     p(`DELETE FROM disputes WHERE asset_id IN (SELECT id FROM assets WHERE org_id = ?1)`),
     p(`DELETE FROM changes WHERE org_id = ?1`),
     p(`DELETE FROM assets WHERE org_id = ?1`),
@@ -258,6 +260,165 @@ export function tagAsset(
       `UPDATE assets SET criticality=COALESCE(?2, criticality), data_sensitivity=COALESCE(?3, data_sensitivity) WHERE id=?1`,
     )
     .bind(id, criticality, data_sensitivity);
+}
+
+// ---- findings + scoring (deterministic evaluation) ----
+
+export async function activeAssetsForOrg(
+  db: D1Database,
+  org_id: string,
+): Promise<Array<{ id: string; entity_type: string; attrs_json: string; state: string }>> {
+  const res = await db
+    .prepare(
+      `SELECT id, entity_type, attrs_json, state FROM assets WHERE org_id = ?1 AND status='active'`,
+    )
+    .bind(org_id)
+    .all<{ id: string; entity_type: string; attrs_json: string; state: string }>();
+  return res.results ?? [];
+}
+
+export function upsertFinding(
+  db: D1Database,
+  f: {
+    id: string;
+    asset_id: string;
+    org_id: string;
+    finding_type: string;
+    severity: string;
+    score: number;
+    evidence_json: string | null;
+    sla_due: string | null;
+    first_seen: string;
+    last_seen: string;
+  },
+) {
+  return db
+    .prepare(
+      `INSERT INTO findings (id, asset_id, org_id, finding_type, severity, score, evidence_json, status, sla_due, first_seen, last_seen)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,'new',?8,?9,?10)
+       ON CONFLICT(id) DO UPDATE SET
+         severity=excluded.severity, score=excluded.score, sla_due=excluded.sla_due,
+         last_seen=excluded.last_seen,
+         status=CASE WHEN findings.status='resolved' THEN 'new' ELSE findings.status END,
+         resolved_at=CASE WHEN findings.status='resolved' THEN NULL ELSE findings.resolved_at END`,
+    )
+    .bind(
+      f.id, f.asset_id, f.org_id, f.finding_type, f.severity, f.score, f.evidence_json,
+      f.sla_due, f.first_seen, f.last_seen,
+    );
+}
+
+export function resolveFindingsNotIn(
+  db: D1Database,
+  org_id: string,
+  keepIds: string[],
+  now: string,
+) {
+  if (keepIds.length === 0) {
+    return db
+      .prepare(`UPDATE findings SET status='resolved', resolved_at=?2 WHERE org_id=?1 AND status!='resolved'`)
+      .bind(org_id, now);
+  }
+  const ph = keepIds.map((_, i) => `?${i + 3}`).join(',');
+  return db
+    .prepare(
+      `UPDATE findings SET status='resolved', resolved_at=?2 WHERE org_id=?1 AND status!='resolved' AND id NOT IN (${ph})`,
+    )
+    .bind(org_id, now, ...keepIds);
+}
+
+const SEV_RANK_SQL = `CASE severity WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'med' THEN 2 WHEN 'low' THEN 1 ELSE 0 END`;
+
+export async function listFindings(db: D1Database, org_id: string | null, limit = 100) {
+  const sql =
+    `SELECT f.id, f.asset_id, f.org_id, f.finding_type, f.severity, f.score, f.status, f.sla_due,
+            f.first_seen, f.last_seen, a.identity AS asset_identity, a.entity_type AS asset_entity_type
+     FROM findings f JOIN assets a ON a.id = f.asset_id
+     WHERE f.status != 'resolved'` +
+    (org_id ? ` AND f.org_id = ?2` : '') +
+    ` ORDER BY ${SEV_RANK_SQL} DESC, f.sla_due ASC LIMIT ?1`;
+  const stmt = org_id
+    ? db.prepare(sql).bind(limit, org_id)
+    : db.prepare(sql).bind(limit);
+  const res = await stmt.all();
+  return res.results ?? [];
+}
+
+export function replaceVectorsStmts(
+  db: D1Database,
+  org_id: string,
+  period: string,
+  rows: Array<{ vector: string; grade: string; score: number }>,
+): D1PreparedStatement[] {
+  const out: D1PreparedStatement[] = [
+    db.prepare(`DELETE FROM attack_vectors WHERE org_id = ?1`).bind(org_id),
+  ];
+  for (const r of rows) {
+    out.push(
+      db
+        .prepare(
+          `INSERT INTO attack_vectors (id, org_id, vector, grade, score, period) VALUES (?1,?2,?3,?4,?5,?6)`,
+        )
+        .bind(`${org_id}:${r.vector}`, org_id, r.vector, r.grade, r.score, period),
+    );
+  }
+  return out;
+}
+
+export function replaceFrameworkStmts(
+  db: D1Database,
+  org_id: string,
+  period: string,
+  csf: Record<string, number>,
+): D1PreparedStatement[] {
+  const out: D1PreparedStatement[] = [
+    db.prepare(`DELETE FROM framework_scores WHERE org_id = ?1 AND framework='nist_csf'`).bind(org_id),
+  ];
+  for (const [fn, score] of Object.entries(csf)) {
+    out.push(
+      db
+        .prepare(
+          `INSERT INTO framework_scores (id, org_id, framework, function_or_control, score, period) VALUES (?1,?2,'nist_csf',?3,?4,?5)`,
+        )
+        .bind(`${org_id}:nist_csf:${fn}`, org_id, fn, score, period),
+    );
+  }
+  return out;
+}
+
+export function insertOverall(
+  db: D1Database,
+  row: { id: string; org_id: string; score: number; grade: string; confidence: number; computed_at: string },
+) {
+  return db
+    .prepare(
+      `INSERT INTO overall_ratings (id, org_id, score, grade, confidence, computed_at) VALUES (?1,?2,?3,?4,?5,?6)`,
+    )
+    .bind(row.id, row.org_id, row.score, row.grade, row.confidence, row.computed_at);
+}
+
+export async function latestOveralls(db: D1Database, org_id: string, n = 2) {
+  const res = await db
+    .prepare(`SELECT score, grade, confidence, computed_at FROM overall_ratings WHERE org_id=?1 ORDER BY computed_at DESC LIMIT ?2`)
+    .bind(org_id, n)
+    .all<{ score: number; grade: string; confidence: number; computed_at: string }>();
+  return res.results ?? [];
+}
+
+export async function listVectors(db: D1Database, org_id: string) {
+  const res = await db
+    .prepare(`SELECT vector, grade, score FROM attack_vectors WHERE org_id=?1`)
+    .bind(org_id)
+    .all<{ vector: string; grade: string; score: number }>();
+  return res.results ?? [];
+}
+
+export async function listFrameworkCsf(db: D1Database, org_id: string) {
+  const res = await db
+    .prepare(`SELECT function_or_control, score FROM framework_scores WHERE org_id=?1 AND framework='nist_csf'`)
+    .bind(org_id)
+    .all<{ function_or_control: string; score: number }>();
+  return res.results ?? [];
 }
 
 // ---- changes ----

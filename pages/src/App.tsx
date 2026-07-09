@@ -8,6 +8,7 @@ import { ChangesTimeline } from './components/ChangesTimeline.js';
 import { WorldMap } from './components/WorldMap.js';
 import { VectorBoard } from './components/VectorBoard.js';
 import { DisputePanel } from './components/DisputePanel.js';
+import { FindingsPanel } from './components/FindingsPanel.js';
 import { TargetsAdmin } from './components/TargetsAdmin.js';
 import { MttdRace, AttackPath } from './components/Stubs.js';
 
@@ -106,9 +107,13 @@ export function App() {
           </div>
 
           <div className="grid cols-3" style={{ marginBottom: 16 }}>
-            <VectorBoard changes={changes} />
+            <VectorBoard rating={rating} />
             <CsfRadar rating={rating} />
             <MttdRace />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <FindingsPanel refreshKey={changes.length} />
           </div>
 
           <div className="grid cols-2" style={{ marginBottom: 16 }}>

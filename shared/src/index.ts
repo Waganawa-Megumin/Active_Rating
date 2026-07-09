@@ -7,6 +7,7 @@ export * from './identity.js';
 export * from './normalize.js';
 export * from './severity.js';
 export * from './confidence.js';
+export * from './findings.js';
 export * from './config/weights.js';
 export * from './schema/ingest.js';
 export * from './schema/admin.js';

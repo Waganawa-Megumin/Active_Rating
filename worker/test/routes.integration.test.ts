@@ -157,6 +157,56 @@ describe('HTTP routes (real Hono app, in-process)', () => {
     expect(badToken.status).toBe(401);
   });
 
+  it('derives findings + deterministic scores from an ingested exposure', async () => {
+    const org = (await (
+      await app.fetch(
+        req('/admin/orgs', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${ADMIN}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ name: 'ACME', relation_type: 'self', active_confirmed: true }),
+        }),
+        env,
+      )
+    ).json()) as { id: string };
+    const dom = (await (
+      await app.fetch(
+        req('/admin/domains', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${ADMIN}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ org_id: org.id, fqdn: 'example.com' }),
+        }),
+        env,
+      )
+    ).json()) as { id: string };
+    await app.fetch(
+      await signedIngest({
+        schema_version: INGEST_SCHEMA_VERSION,
+        domain_id: dom.id,
+        organization_id: org.id,
+        source: { adapter: 'offline', is_authoritative: true, profile: 'active' },
+        run_at: '2026-07-08T00:00:00.000Z',
+        run_id: 'run-1',
+        entities: [
+          { entity_type: 'exposure', identity: 'intelx:leaks/1', attributes: { bucket: 'leaks' }, observed_at: '2026-07-08T00:00:00.000Z', signals: { source_count: 2 } },
+        ],
+      }),
+      env,
+    );
+
+    const findings = (await (await app.fetch(apiReq('/api/findings'), env)).json()) as unknown[];
+    expect(findings.length).toBe(1);
+    expect((findings[0] as { severity: string }).severity).toBe('critical');
+
+    const rating = (await (await app.fetch(apiReq(`/api/rating/${org.id}`), env)).json()) as {
+      provisional: boolean;
+      vectors: Array<{ vector: string; grade: string }>;
+      score: number;
+    };
+    expect(rating.provisional).toBe(false);
+    const cred = rating.vectors.find((v) => v.vector === 'credential');
+    expect(cred?.grade).toBe('C'); // 100 - 30(critical) = 70 -> C
+  });
+
   it('cascade-deletes an org with its domains and scan data', async () => {
     const org = (await (
       await app.fetch(

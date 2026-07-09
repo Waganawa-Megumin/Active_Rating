@@ -1,44 +1,40 @@
-import type { Change } from '../api/client.js';
+import type { Rating } from '../api/client.js';
 
-// 9ベクター信号盤 (design v0.6 §D). P1: derive a coarse A–F signal per vector
-// from the change/severity mix mapped to attack vectors. Full grade algorithm +
-// threat weighting is P5.
-const VECTORS: Array<{ key: string; label: string; types: string[] }> = [
-  { key: 'vpn', label: 'VPN', types: ['vpn'] },
-  { key: 'webapp', label: 'WebApp', types: ['web'] },
-  { key: 'email', label: 'Email', types: ['email_auth'] },
-  { key: 'dns', label: 'DNS', types: ['dns', 'subdomain'] },
-  { key: 'credential', label: 'Credential', types: ['exposure'] },
-  { key: 'cloud', label: 'Cloud', types: ['exposure'] },
-  { key: 'pki', label: 'PKI', types: ['cert'] },
-  { key: 'netsvc', label: 'NetSvc', types: ['service'] },
-  { key: 'compromise', label: 'Compromise', types: [] },
-];
+// 9ベクター信号盤 (design v0.6 §D). Reads the deterministic A–F grades computed
+// by the worker's evaluation step (persisted attack_vectors).
+const LABEL: Record<string, string> = {
+  vpn: 'VPN',
+  webapp: 'WebApp',
+  email: 'Email',
+  dns: 'DNS',
+  credential: 'Credential',
+  cloud: 'Cloud',
+  pki: 'PKI',
+  netsvc: 'NetSvc',
+  compromise: 'Compromise',
+};
+const ORDER = ['vpn', 'webapp', 'email', 'dns', 'credential', 'cloud', 'pki', 'netsvc', 'compromise'];
+const GRADE_COLOR: Record<string, string> = {
+  A: 'var(--accent)',
+  B: '#7fd04a',
+  C: '#e8b339',
+  D: '#ef8a5a',
+  F: '#ef5a5a',
+};
 
-const SEV_PENALTY: Record<string, number> = { info: 0, low: 1, med: 4, high: 12, critical: 30 };
-
-function grade(score: number): { g: string; c: string } {
-  if (score >= 90) return { g: 'A', c: '#37d0a0' };
-  if (score >= 80) return { g: 'B', c: '#7fd04a' };
-  if (score >= 65) return { g: 'C', c: '#e8b339' };
-  if (score >= 50) return { g: 'D', c: '#ef8a5a' };
-  return { g: 'F', c: '#ef5a5a' };
-}
-
-export function VectorBoard({ changes }: { changes: Change[] }) {
+export function VectorBoard({ rating }: { rating: Rating | null }) {
+  const map = new Map((rating?.vectors ?? []).map((v) => [v.vector, v]));
   return (
     <div className="panel">
       <h2>ベクター信号盤（A–F）</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-        {VECTORS.map((v) => {
-          const penalty = changes
-            .filter((c) => v.types.includes(c.entity_type))
-            .reduce((acc, c) => acc + (SEV_PENALTY[c.severity] ?? 0), 0);
-          const score = Math.max(0, 100 - penalty);
-          const { g, c } = grade(score);
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 9 }}>
+        {ORDER.map((key) => {
+          const v = map.get(key);
+          const grade = v?.grade ?? '—';
+          const color = GRADE_COLOR[grade] ?? 'var(--muted)';
           return (
             <div
-              key={v.key}
+              key={key}
               style={{
                 border: '1px solid var(--line)',
                 borderRadius: 8,
@@ -46,16 +42,18 @@ export function VectorBoard({ changes }: { changes: Change[] }) {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                background: 'var(--panel-2)',
               }}
+              title={v ? `score ${v.score}` : undefined}
             >
-              <span style={{ fontSize: 13 }}>{v.label}</span>
-              <span style={{ fontWeight: 800, fontSize: 18, color: c }}>{g}</span>
+              <span style={{ fontSize: 12.5, color: 'var(--fg-dim, var(--muted))' }}>{LABEL[key]}</span>
+              <span style={{ fontWeight: 800, fontSize: 18, color }}>{grade}</span>
             </div>
           );
         })}
       </div>
       <div className="hint" style={{ marginTop: 10 }}>
-        暫定グレード。脅威加重（ATT&amp;CK）・検知ギャップ反映はP5。
+        Findings の重大度から決定論的に算出（数値は決定論・LLMは批評のみ）。脅威加重・検知ギャップはP4/P5。
       </div>
     </div>
   );

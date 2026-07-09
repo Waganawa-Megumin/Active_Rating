@@ -8,6 +8,7 @@ import { getDomain } from '../db/queries.js';
 import { runDiff } from '../diff/engine.js';
 import { buildSlackMessage, notifySlack } from '../notify/slack.js';
 import { loadWorkerWeights } from '../weights.js';
+import { recomputeOrg } from '../score/recompute.js';
 
 export const ingestRoute = new Hono<{ Bindings: Bindings }>();
 
@@ -44,6 +45,9 @@ ingestRoute.post('/ingest', async (c) => {
   // 4) Diff.
   const weights = await loadWorkerWeights(c.env);
   const summary = await runDiff(c.env, payload, { org_id: domain.org_id, weights });
+
+  // 4b) Continuous evaluation: derive findings + deterministic scores for the org.
+  await recomputeOrg(c.env, domain.org_id, payload.run_at);
 
   // 5) Notify (batched, med+ immediate).
   const org = await c.env.DB.prepare('SELECT name FROM organizations WHERE id = ?1')

@@ -77,14 +77,34 @@ export interface Change {
   detected_at: string;
 }
 
+export interface VectorGrade {
+  vector: string;
+  grade: string;
+  score: number;
+}
 export interface Rating {
   org_id: string;
   assets: { total: number; confirmed: number };
-  severityCounts: Record<string, number>;
+  severityCounts?: Record<string, number>;
   score: number;
   grade: string;
+  confidence?: number;
+  trend?: number;
   csf: { GV: number; ID: number; PR: number; DE: number; RS: number; RC: number };
+  vectors?: VectorGrade[];
   provisional: boolean;
+}
+
+export interface Finding {
+  id: string;
+  asset_id: string;
+  org_id: string;
+  finding_type: string;
+  severity: 'info' | 'low' | 'med' | 'high' | 'critical';
+  status: string;
+  sla_due: string | null;
+  asset_identity: string;
+  asset_entity_type: string;
 }
 
 export interface FpRate {
@@ -126,7 +146,16 @@ export const api = {
   changes: (limit = 200) => getJson<Change[]>(`/api/changes?limit=${limit}`),
   assets: (limit = 500) => getJson<Array<Record<string, unknown>>>(`/api/assets?limit=${limit}`),
   rating: (orgId: string) => getJson<Rating>(`/api/rating/${orgId}`),
+  findings: (limit = 100) => getJson<Finding[]>(`/api/findings?limit=${limit}`),
   fpRate: () => getJson<FpRate>('/api/fp-rate'),
+  async dispute(asset_id: string, claim: string) {
+    const res = await fetch(`${API_BASE}/dispute`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'content-type': 'application/json' },
+      body: JSON.stringify({ asset_id, claim }),
+    });
+    return { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
+  },
   async registerOrg(body: unknown) {
     const res = await fetch(`${API_BASE}/admin/orgs`, {
       method: 'POST',

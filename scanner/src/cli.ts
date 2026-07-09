@@ -102,7 +102,8 @@ async function main() {
   let totalAdded = 0,
     totalChanged = 0,
     totalRemoved = 0,
-    failures = 0;
+    failures = 0, // hard failures: domain yielded nothing, or ingest failed
+    sourceWarnings = 0; // soft: a single source failed but others carried the domain
 
   for (const domain of targets) {
     const profile = profileFor(domain.relation_type, domain.active_confirmed);
@@ -121,11 +122,20 @@ async function main() {
         collected.push({ name: adapter.name, authoritative: adapter.authoritative });
         for (const e of entities) mergeEntity(byKey, e, adapter.name);
       } catch (err) {
-        failures++;
-        console.error(`[error] ${domain.fqdn} via ${adapter.name}:`, (err as Error).message);
+        // A flaky passive corroboration source (e.g. crt.sh 503) must not red the
+        // whole scan — warn and let the other sources carry the domain.
+        sourceWarnings++;
+        console.error(`[warn] ${domain.fqdn} via ${adapter.name}:`, (err as Error).message);
       }
     }
-    if (collected.length === 0) continue;
+    if (collected.length === 0) {
+      // Every source for this domain failed — nothing to ingest. Hard failure.
+      if (adapters.length > 0) {
+        failures++;
+        console.error(`[fail] ${domain.fqdn}: all ${adapters.length} source(s) failed`);
+      }
+      continue;
+    }
 
     merged = finalizeMerge(byKey);
     const sources = collected.map((c) => c.name);
@@ -160,8 +170,11 @@ async function main() {
   }
 
   console.log(
-    `[scan] done — total +${totalAdded} ~${totalChanged} -${totalRemoved}, ${failures} failure(s)`,
+    `[scan] done — total +${totalAdded} ~${totalChanged} -${totalRemoved}, ` +
+      `${failures} failure(s), ${sourceWarnings} source warning(s)`,
   );
+  // Only hard failures (a domain that produced no snapshot, or a failed ingest)
+  // are fatal. Transient single-source outages are warnings — the run stays green.
   if (failures > 0) process.exit(1);
 }
 

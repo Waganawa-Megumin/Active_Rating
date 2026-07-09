@@ -3,13 +3,23 @@
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/$/, '');
 const TOKEN_KEY = 'ar_admin_token';
+const ACCOUNT_KEY = 'ar_admin_account';
 
-export function getToken(): string {
+/** Default admin account name (override at build via VITE_ADMIN_ACCOUNT). */
+export const DEFAULT_ACCOUNT = import.meta.env.VITE_ADMIN_ACCOUNT ?? 'ar-admin';
+
+function ss(key: string): string {
   try {
-    return sessionStorage.getItem(TOKEN_KEY) ?? '';
+    return sessionStorage.getItem(key) ?? '';
   } catch {
     return '';
   }
+}
+export function getToken(): string {
+  return ss(TOKEN_KEY);
+}
+export function getAccount(): string {
+  return ss(ACCOUNT_KEY);
 }
 export function setToken(t: string): void {
   try {
@@ -18,9 +28,17 @@ export function setToken(t: string): void {
     /* ignore */
   }
 }
+function setAccount(a: string): void {
+  try {
+    sessionStorage.setItem(ACCOUNT_KEY, a);
+  } catch {
+    /* ignore */
+  }
+}
 export function clearToken(): void {
   try {
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(ACCOUNT_KEY);
   } catch {
     /* ignore */
   }
@@ -80,17 +98,19 @@ async function getJson<T>(path: string): Promise<T> {
 
 export const api = {
   base: API_BASE,
-  /** Validate a token against the protected /api/session endpoint. */
-  async login(token: string): Promise<boolean> {
+  /** Validate an account name + token against the protected /api/session endpoint. */
+  async login(account: string, token: string): Promise<boolean> {
     const res = await fetch(`${API_BASE}/api/session`, {
-      headers: { authorization: `Bearer ${token}` },
+      headers: { authorization: `Bearer ${token}`, 'x-ar-user': account },
     });
     if (res.ok) {
       setToken(token);
+      setAccount(account);
       return true;
     }
     return false;
   },
+  account: getAccount,
   logout: clearToken,
   hasToken: () => getToken().length > 0,
   health: () => getJson<{ ok: boolean; offline: boolean }>('/api/health'),

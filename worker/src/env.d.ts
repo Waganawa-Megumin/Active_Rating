@@ -9,6 +9,7 @@ export interface Bindings {
   // vars
   OFFLINE: string;
   SLACK_ENABLED: string;
+  ADMIN_USER?: string; // admin account name for the dashboard login (default "ar-admin")
   // secrets
   INGEST_HMAC_SECRET: string;
   ADMIN_TOKEN: string;

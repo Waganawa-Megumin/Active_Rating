@@ -128,6 +128,35 @@ describe('HTTP routes (real Hono app, in-process)', () => {
     expect(rating.score).toBeGreaterThan(0);
   });
 
+  it('login: /api/session needs the right account name AND token', async () => {
+    // correct token + correct account -> 200
+    const ok = await app.fetch(
+      new Request('http://localhost/api/session', {
+        headers: { authorization: `Bearer ${ADMIN}`, 'x-ar-user': 'ar-admin' },
+      }),
+      env,
+    );
+    expect(ok.status).toBe(200);
+
+    // correct token, wrong account -> 401
+    const badUser = await app.fetch(
+      new Request('http://localhost/api/session', {
+        headers: { authorization: `Bearer ${ADMIN}`, 'x-ar-user': 'someone-else' },
+      }),
+      env,
+    );
+    expect(badUser.status).toBe(401);
+
+    // wrong token -> 401 (blocked before the account check)
+    const badToken = await app.fetch(
+      new Request('http://localhost/api/session', {
+        headers: { authorization: 'Bearer nope', 'x-ar-user': 'ar-admin' },
+      }),
+      env,
+    );
+    expect(badToken.status).toBe(401);
+  });
+
   it('rejects an ingest with a bad signature (401)', async () => {
     const payload: IngestPayload = {
       schema_version: INGEST_SCHEMA_VERSION,

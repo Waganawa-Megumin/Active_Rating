@@ -42,8 +42,14 @@ apiRoute.use('/api/*', async (c, next) => {
 
 apiRoute.get('/api/health', (c) => c.json({ ok: true, offline: c.env.OFFLINE === '1' }));
 
-// Login validation: returns 200 only when the bearer matches (protected above).
-apiRoute.get('/api/session', (c) => c.json({ ok: true }));
+// Login validation: the bearer is already verified by the middleware above; here
+// we additionally check the account name so the login is a named admin account.
+apiRoute.get('/api/session', (c) => {
+  const account = c.env.ADMIN_USER || 'ar-admin';
+  const user = c.req.header('x-ar-user') ?? '';
+  if (user !== account) return c.text('unknown account', 401);
+  return c.json({ ok: true, account });
+});
 
 // Org tree (with profile derivation for badges).
 apiRoute.get('/api/organizations', async (c) => {

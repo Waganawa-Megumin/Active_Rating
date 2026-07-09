@@ -77,9 +77,10 @@ export function App() {
         <button className={tab === 'targets' ? 'active' : ''} onClick={() => setTab('targets')}>
           Targets / 登録
         </button>
-        <button onClick={() => void loadBase()} style={{ marginLeft: 'auto' }}>
-          ⟳ 更新
-        </button>
+        <span className="acct" style={{ marginLeft: 'auto' }}>
+          <span className="acct-dot" /> {api.account() || 'ar-admin'}
+        </span>
+        <button onClick={() => void loadBase()}>⟳ 更新</button>
         <button
           onClick={() => {
             api.logout();

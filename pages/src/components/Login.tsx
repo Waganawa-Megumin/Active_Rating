@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { api } from '../api/client.js';
+import { api, DEFAULT_ACCOUNT } from '../api/client.js';
 
 // Admin-only gate. GitHub Pages serves the shell publicly; no data loads until
-// the admin token (same value as the worker ADMIN_TOKEN) is verified.
+// the admin account name + token (worker ADMIN_USER / ADMIN_TOKEN) are verified.
 export function Login({ onAuthed }: { onAuthed: () => void }) {
+  const [account, setAccount] = useState(DEFAULT_ACCOUNT);
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -13,9 +14,9 @@ export function Login({ onAuthed }: { onAuthed: () => void }) {
     setBusy(true);
     setErr(null);
     try {
-      const ok = await api.login(token.trim());
+      const ok = await api.login(account.trim(), token.trim());
       if (ok) onAuthed();
-      else setErr('トークンが違います。worker の ADMIN_TOKEN と同じ値を入力してください。');
+      else setErr('アカウント名またはトークンが違います。');
     } catch {
       setErr(`${api.base} に接続できません。`);
     } finally {
@@ -32,6 +33,16 @@ export function Login({ onAuthed }: { onAuthed: () => void }) {
         <p className="subtitle" style={{ margin: '0 0 18px' }}>
           管理者ログイン — 能動検証・証跡主義の攻撃面評価
         </p>
+        <label className="login-label">
+          アカウント名
+          <input
+            type="text"
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
+            placeholder="ar-admin"
+            autoComplete="username"
+          />
+        </label>
         <label className="login-label">
           ADMIN TOKEN
           <input

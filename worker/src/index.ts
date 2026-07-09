@@ -17,7 +17,7 @@ export const app = new Hono<{ Bindings: Bindings }>();
 // Dashboard is a separate origin (GitHub Pages / Cloudflare Pages) — allow the
 // Authorization bearer from the browser on both read and admin routes.
 const corsOpts = {
-  allowHeaders: ['authorization', 'content-type'],
+  allowHeaders: ['authorization', 'content-type', 'x-ar-user'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 };
 app.use('/api/*', cors(corsOpts));

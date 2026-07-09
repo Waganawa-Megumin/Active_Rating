@@ -36,6 +36,7 @@ crons = ["0 */6 * * *"]
 [vars]
 OFFLINE = "0"
 SLACK_ENABLED = "1"
+ADMIN_USER = "ar-admin"
 # Secrets (set via `wrangler secret put`, NEVER commit):
 #   INGEST_HMAC_SECRET   - shared with the scanner for /ingest signing
 #   ADMIN_TOKEN          - bearer token for the registration Admin API

@@ -5,6 +5,7 @@
 import type { Profile } from '@ar/shared';
 import type { Adapter } from './types.js';
 import { CrtShAdapter } from './crtsh.js';
+import { EmailAuthAdapter } from './email.js';
 import { OfflineAdapter } from './offline.js';
 
 export interface RegistryOptions {
@@ -17,6 +18,7 @@ export function getAdapters(profile: Profile, opts: RegistryOptions): Adapter[] 
 
   const all: Adapter[] = [
     new CrtShAdapter(),
+    new EmailAuthAdapter(), // passive DNS: SPF/DMARC/MTA-STS
     // Phase 4+: new IntelxAdapter(), new ShodanAdapter(), new HibpAdapter(), ...
   ];
   // Only adapters safe for this profile (passive excludes active-only sources).

@@ -17,7 +17,8 @@ export type EntityType =
   | 'web'
   | 'exposure'
   | 'asn'
-  | 'vpn';
+  | 'vpn'
+  | 'email';
 
 /** Append-only change log kinds (design v1.0 §5 changes.change_type). */
 export type ChangeKind = 'ADDED' | 'REMOVED' | 'CHANGED';

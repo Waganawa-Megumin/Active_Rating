@@ -15,6 +15,7 @@ export const EntityTypeSchema = z.enum([
   'exposure',
   'asn',
   'vpn',
+  'email',
 ]);
 
 export const ProfileSchema = z.enum(['active', 'passive']);

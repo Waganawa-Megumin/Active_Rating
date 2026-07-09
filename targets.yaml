@@ -1,41 +1,18 @@
-# Active Rating — 対象アセット宣言（GitOps 登録ソース）
-# `npm run register -- --file targets.yaml --api <worker-url>` で Admin API 経由に upsert される。
-# organizations は自己参照ツリー。relation_type がスキャン強度(active/passive)を決める。
+# Active Rating — 対象アセット宣言（GitOps 登録ソース・これが正）
+# `npm run register -- --file targets.yaml --api <worker-url> --prune` で
+# ここに宣言した組織/ドメインへ D1 をリコンサイル（宣言外の組織は削除）する。
+# デプロイ時に自動実行されるため、このファイルが常に「正」となる。
 #
 #   relation_type: self | subsidiary | supplier | partner | watch
-#   active_confirmed: true の self/subsidiary のみ能動(active)スキャン対象。
-#                     それ以外・未確認は passive にフォールバックされる（コードレベルで強制）。
-#
-# key は宣言内での参照用の安定エイリアス。register CLI がこの key を安定IDにマップして冪等 upsert する。
+#   active_confirmed: true の self/subsidiary のみ能動(active)。それ以外は passive。
 
 organizations:
-  - key: acme-root
-    name: "ACME Holdings"
+  - key: nec
+    name: "NEC Corporation"
     relation_type: self
     active_confirmed: true
-    slack_channel: "#asm-acme"
-    notes: "親会社（自組織）。能動スキャン許可済み。"
+    slack_channel: "#asm-nec"
+    notes: "自組織。能動スキャン許可済み。"
     domains:
-      - fqdn: example.com
-        enabled: true
-
-  - key: acme-sub-x
-    name: "ACME Subsidiary X"
-    parent: acme-root
-    relation_type: subsidiary
-    active_confirmed: true
-    slack_channel: "#asm-sub-x"
-    notes: "100%子会社。オーナーシップ確認済み。"
-    domains:
-      - fqdn: sub-x.example.net
-        enabled: true
-
-  - key: supplier-y
-    name: "Supplier Y"
-    parent: acme-root
-    relation_type: supplier
-    active_confirmed: false
-    notes: "サプライチェーン。受動観測のみ（能動スキャン禁止）。"
-    domains:
-      - fqdn: supplier-y.example.org
+      - fqdn: nec.com
         enabled: true

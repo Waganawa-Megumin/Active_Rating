@@ -71,6 +71,16 @@ export function findingForAsset(
         severity: leaks ? 'critical' : 'high',
       };
     }
+    case 'email': {
+      // attrs: { dmarc: 'reject'|'quarantine'|'none'|null, spf: 'strict'|'soft'|'neutral'|'none'|null }
+      const dmarc = attrs.dmarc as string | null | undefined;
+      const spf = attrs.spf as string | null | undefined;
+      if (dmarc == null) return { finding_type: 'email_auth', vector: 'email', severity: 'high' }; // spoofable
+      if (dmarc === 'none') return { finding_type: 'email_auth', vector: 'email', severity: 'med' };
+      if (spf == null || spf === 'none' || spf === 'neutral')
+        return { finding_type: 'email_auth', vector: 'email', severity: 'low' };
+      return null; // DMARC enforced + SPF present
+    }
     case 'vpn':
       return { finding_type: 'vpn_misconfig', vector: 'vpn', severity: 'med' };
     case 'service':

@@ -40,6 +40,8 @@ export function identityOf(
       return String(parts.cidr ?? '');
     case 'vpn':
       return canonicalHost(String(parts.fqdn ?? parts.host ?? ''));
+    case 'email':
+      return `email:${canonicalHost(String(parts.domain ?? ''))}`;
     default: {
       const _exhaustive: never = entity_type;
       return String(_exhaustive);

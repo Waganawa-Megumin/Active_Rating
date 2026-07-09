@@ -12,13 +12,15 @@ import { RegistrationDocSchema, type RegistrationDoc } from '@ar/shared';
 interface Args {
   file: string;
   api: string;
+  prune: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const a: Args = { file: 'targets.yaml', api: 'http://localhost:8787' };
+  const a: Args = { file: 'targets.yaml', api: 'http://localhost:8787', prune: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--file') a.file = argv[++i];
     else if (argv[i] === '--api') a.api = argv[++i];
+    else if (argv[i] === '--prune') a.prune = true;
   }
   return a;
 }
@@ -32,6 +34,30 @@ async function postJson(url: string, token: string, body: unknown): Promise<Reco
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) throw new Error(`POST ${url} -> HTTP ${res.status}: ${JSON.stringify(json)}`);
   return json;
+}
+
+/** Delete orgs that are NOT declared in targets.yaml (GitOps reconcile). */
+async function pruneUndeclared(apiBase: string, token: string, declaredNames: Set<string>) {
+  const res = await fetch(`${apiBase}/api/organizations`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`prune: list orgs -> HTTP ${res.status}`);
+  const orgs = (await res.json()) as Array<{ id: string; name: string }>;
+  let removed = 0;
+  for (const o of orgs) {
+    if (declaredNames.has(o.name)) continue;
+    const del = await fetch(`${apiBase}/admin/orgs/${encodeURIComponent(o.id)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (del.ok) {
+      removed++;
+      console.log(`[prune] removed ${o.name}`);
+    } else {
+      console.error(`[prune] failed to remove ${o.name}: HTTP ${del.status}`);
+    }
+  }
+  console.log(`[prune] removed ${removed} undeclared organization(s)`);
 }
 
 async function main() {
@@ -89,6 +115,11 @@ async function main() {
     process.exit(1);
   }
   console.log(`[register] done — ${keyToId.size} organization(s)`);
+
+  if (args.prune) {
+    const declaredNames = new Set(doc.organizations.map((o) => o.name));
+    await pruneUndeclared(apiBase, token, declaredNames);
+  }
 }
 
 main().catch((err) => {

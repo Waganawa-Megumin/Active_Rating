@@ -5,11 +5,11 @@ import { RatingGauge } from './components/RatingGauge.js';
 import { CsfRadar } from './components/CsfRadar.js';
 import { OrgTree } from './components/OrgTree.js';
 import { ChangesTimeline } from './components/ChangesTimeline.js';
-import { Globe } from './components/Globe.js';
+import { WorldMap } from './components/WorldMap.js';
 import { VectorBoard } from './components/VectorBoard.js';
 import { DisputePanel } from './components/DisputePanel.js';
 import { TargetsAdmin } from './components/TargetsAdmin.js';
-import { MttdRace, WorldMap, AttackPath } from './components/Stubs.js';
+import { MttdRace, AttackPath } from './components/Stubs.js';
 
 type Tab = 'dashboard' | 'targets';
 
@@ -98,12 +98,10 @@ export function App() {
 
       {tab === 'dashboard' ? (
         <>
+          {/* Hero: the rating is the headline, not the map. */}
           <div className="grid hero" style={{ marginBottom: 16 }}>
-            <Globe assets={assets} />
-            <div className="grid" style={{ gridTemplateRows: 'auto auto' }}>
-              <RatingGauge rating={rating} />
-              <DisputePanel fp={fp} />
-            </div>
+            <RatingGauge rating={rating} />
+            <DisputePanel fp={fp} />
           </div>
 
           <div className="grid cols-3" style={{ marginBottom: 16 }}>
@@ -117,9 +115,10 @@ export function App() {
             <ChangesTimeline changes={changes} />
           </div>
 
+          {/* Secondary: geo distribution lives lower, not at the top. */}
           <div className="grid cols-2">
             <AttackPath />
-            <WorldMap />
+            <WorldMap assets={assets} />
           </div>
         </>
       ) : (

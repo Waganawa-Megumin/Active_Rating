@@ -16,21 +16,6 @@ export function MttdRace() {
   );
 }
 
-export function WorldMap() {
-  return (
-    <div className="panel">
-      <h2>世界地図（漏洩・フィッシング分布）</h2>
-      <div className="stub">
-        <span className="phase">P6</span>
-        <div>MapLibre GL でコロプレス／ヒートマップ。</div>
-        <div className="hint">
-          クレデンシャル漏洩・フィッシングインフラの地理集中。無料タイルでトークン課金を回避。
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AttackPath() {
   return (
     <div className="panel">

@@ -115,6 +115,19 @@ button.primary:disabled { opacity: 0.5; cursor: default; }
 }
 .login-card button.primary { width: 100%; }
 
+/* world map */
+:root { --map-sea: #0e1622; --map-land: #223142; --map-land-line: #33475d; }
+.worldmap { width: 100%; }
+.worldmap svg { width: 100%; height: auto; display: block; }
+.map-land path { fill: var(--map-land); stroke: var(--map-land-line); stroke-width: 0.4; }
+.pt-halo { fill: none; }
+.pt-confirmed { fill: var(--accent); stroke: rgba(255,255,255,0.35); stroke-width: 0.6; }
+.pt-estimated { fill: var(--sev-med); stroke: rgba(255,255,255,0.2); stroke-width: 0.6; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin: 8px 0 4px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.legend .dot-confirmed { background: var(--accent); }
+.legend .dot-estimated { background: var(--sev-med); }
+
 .stub { color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
 .stub .phase { color: var(--accent-2); font-size: 11px; font-weight: 700; }
 .globe-wrap { min-height: 340px; display: flex; align-items: center; justify-content: center; }
